@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lsia
+      POSTGRES_PASSWORD: lsia
+      POSTGRES_DB: lsia
+    ports:
+      - "5432:5432"
+    volumes:
+      - lsia_pg:/var/lib/postgresql/data
+
+volumes:
+  lsia_pg:
