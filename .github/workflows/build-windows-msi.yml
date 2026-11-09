@@ -37,31 +37,25 @@ jobs:
           npm ci
           npm run build
 
-      - name: Setup WiX Toolset v3
+      - name: Install WiX Toolset v3 via Chocolatey
         shell: powershell
         run: |
+          choco install wixtoolset --yes --no-progress --version 3.11.2
           $WixBin = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
           if (-not (Test-Path "$WixBin\candle.exe")) {
-            Write-Host "WiX v3.11 not found at $WixBin. Installing via Chocolatey..." -ForegroundColor Yellow
-            choco install wixtoolset --yes --no-progress
-          }
-          if (Test-Path "$WixBin\candle.exe") {
-            Write-Host "WiX Toolset found at $WixBin" -ForegroundColor Green
-            echo "$WixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          } else {
-            $CandleCmd = Get-Command "candle.exe" -ErrorAction SilentlyContinue
-            if ($CandleCmd) {
-              $Dir = Split-Path -Parent $CandleCmd.Source
-              Write-Host "WiX Toolset found in PATH at $Dir" -ForegroundColor Green
-              echo "$Dir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            } else {
-              Write-Error "Failed to locate WiX Toolset binaries."
+            # Try alternate detection
+            $found = Get-ChildItem "C:\Program Files (x86)" -Filter "candle.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) {
+              $WixBin = $found.DirectoryName
             }
           }
+          Write-Host "WiX bin: $WixBin"
+          echo "WIXBIN=$WixBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build MSI Installer with WiX Toolset
         shell: powershell
         run: |
+          $env:PATH = "$env:WIXBIN;$env:PATH"
           powershell -ExecutionPolicy Bypass -File installer/wix/build-msi.ps1 -OutputDir installer_output
 
       - name: Upload MSI Artifact
