@@ -23,10 +23,11 @@ function Find-WixBin {
     $candidates = @(
         "C:\Program Files (x86)\WiX Toolset v3.11\bin",
         "C:\Program Files (x86)\WiX Toolset v3.14\bin",
-        "C:\Program Files\WiX Toolset v3.11\bin"
+        "C:\Program Files\WiX Toolset v3.11\bin",
+        "$env:RUNNER_TEMP\wix311"
     )
     foreach ($p in $candidates) {
-        if (Test-Path "$p\candle.exe") { return $p }
+        if ($p -and (Test-Path "$p\candle.exe")) { return $p }
     }
 
     # 4. Search Program Files
@@ -76,28 +77,37 @@ Copy-Item -Path (Join-Path $ServerDir "pyproject.toml") -Destination "$StageServ
 Copy-Item -Recurse -Path (Join-Path $ServerDir "lsia") -Destination (Join-Path $StageServerDir "lsia")
 Get-ChildItem -Path $StageServerDir -Include "__pycache__","*.pyc","*.pyo" -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
+# Normalize paths to use forward slashes for WiX parameters
+$TempObjDir = ($TempObj -replace '\\', '/') + '/'
+$ServerWxs = Join-Path $TempObj "ServerFiles.wxs"
+$AdminWxs  = Join-Path $TempObj "AdminFiles.wxs"
+
 # --- Harvest ---
 Write-Host "[2/4] Harvesting file lists with heat..." -ForegroundColor Green
 & $Heat dir "$StageServerDir" -cg ServerFilesGroup -dr SERVERFOLDER -scom -sfrag -srd `
-    -var "var.StageServerDir" -out "$TempObj\ServerFiles.wxs"
+    -var "var.StageServerDir" -out "$ServerWxs"
 if ($LASTEXITCODE -ne 0) { Write-Error "heat failed for server files"; exit 1 }
 
 & $Heat dir "$AdminDistDir" -cg AdminFilesGroup -dr ADMINDISTFOLDER -scom -sfrag -srd `
-    -var "var.AdminDistDir" -out "$TempObj\AdminFiles.wxs"
+    -var "var.AdminDistDir" -out "$AdminWxs"
 if ($LASTEXITCODE -ne 0) { Write-Error "heat failed for admin dist files"; exit 1 }
 
 # --- Compile ---
 Write-Host "[3/4] Compiling WiX sources (candle)..." -ForegroundColor Green
-& $Candle "$PSScriptRoot\Product.wxs" "$TempObj\ServerFiles.wxs" "$TempObj\AdminFiles.wxs" `
+& $Candle "$PSScriptRoot\Product.wxs" "$ServerWxs" "$AdminWxs" `
     -dRepoRoot="$RepoRoot" -dStageServerDir="$StageServerDir" -dAdminDistDir="$AdminDistDir" `
     -ext WixFirewallExtension -ext WixUIExtension `
-    -out "$TempObj\"
+    -out "$TempObjDir"
 if ($LASTEXITCODE -ne 0) { Write-Error "candle compilation failed"; exit 1 }
 
 # --- Link ---
 Write-Host "[4/4] Linking MSI (light)..." -ForegroundColor Green
 $MsiOutput = Join-Path $OutputDir "LSIASchoolComputer.msi"
-& $Light "$TempObj\Product.wixobj" "$TempObj\ServerFiles.wixobj" "$TempObj\AdminFiles.wixobj" `
+$ProductObj = Join-Path $TempObj "Product.wixobj"
+$ServerObj  = Join-Path $TempObj "ServerFiles.wixobj"
+$AdminObj   = Join-Path $TempObj "AdminFiles.wixobj"
+
+& $Light "$ProductObj" "$ServerObj" "$AdminObj" `
     -ext WixFirewallExtension -ext WixUIExtension `
     -sval -out "$MsiOutput"
 if ($LASTEXITCODE -ne 0) { Write-Error "light linking failed"; exit 1 }

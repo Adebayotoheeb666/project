@@ -7,10 +7,11 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .env
-data/
+/data/
 *.db
 node_modules/
 admin/.vite/
+admin/dist/
 .DS_Store
 Thumbs.db
 
@@ -25,3 +26,5 @@ android/.idea/
 
 # Installer
 installer_output/
+*.wixobj
+*.wixpdb

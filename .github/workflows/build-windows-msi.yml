@@ -14,7 +14,7 @@ permissions:
 jobs:
   build-msi:
     name: Build LSIA Windows MSI Installer
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout repository
@@ -34,28 +34,30 @@ jobs:
         shell: cmd
         run: |
           cd admin
-          npm ci
-          npm run build
+          call npm ci
+          call npm run build
 
-      - name: Install WiX Toolset v3 via Chocolatey
+      - name: Setup WiX Toolset v3
         shell: powershell
         run: |
-          choco install wixtoolset --yes --no-progress --version 3.11.2
           $WixBin = "C:\Program Files (x86)\WiX Toolset v3.11\bin"
           if (-not (Test-Path "$WixBin\candle.exe")) {
-            # Try alternate detection
-            $found = Get-ChildItem "C:\Program Files (x86)" -Filter "candle.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($found) {
-              $WixBin = $found.DirectoryName
+            Write-Host "WiX v3.11 not in standard path. Downloading portable WiX binaries..." -ForegroundColor Yellow
+            $WixBin = "$env:RUNNER_TEMP\wix311"
+            if (-not (Test-Path "$WixBin\candle.exe")) {
+              New-Item -ItemType Directory -Path $WixBin -Force | Out-Null
+              Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile "$env:RUNNER_TEMP\wix311.zip"
+              Expand-Archive -Path "$env:RUNNER_TEMP\wix311.zip" -DestinationPath $WixBin -Force
             }
           }
-          Write-Host "WiX bin: $WixBin"
+          Write-Host "WiX binaries located at: $WixBin" -ForegroundColor Green
+          echo "$WixBin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "WIXBIN=$WixBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build MSI Installer with WiX Toolset
         shell: powershell
         run: |
-          $env:PATH = "$env:WIXBIN;$env:PATH"
+          if ($env:WIXBIN) { $env:PATH = "$env:WIXBIN;$env:PATH" }
           powershell -ExecutionPolicy Bypass -File installer/wix/build-msi.ps1 -OutputDir installer_output
 
       - name: Upload MSI Artifact
