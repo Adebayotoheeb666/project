@@ -46,8 +46,9 @@ jobs:
             $WixBin = "$env:RUNNER_TEMP\wix311"
             if (-not (Test-Path "$WixBin\candle.exe")) {
               New-Item -ItemType Directory -Path $WixBin -Force | Out-Null
-              Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile "$env:RUNNER_TEMP\wix311.zip"
-              Expand-Archive -Path "$env:RUNNER_TEMP\wix311.zip" -DestinationPath $WixBin -Force
+              curl.exe -fSL "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -o "$env:RUNNER_TEMP\wix311.zip"
+              Add-Type -AssemblyName System.IO.Compression.FileSystem
+              [System.IO.Compression.ZipFile]::ExtractToDirectory("$env:RUNNER_TEMP\wix311.zip", $WixBin)
             }
           }
           Write-Host "WiX binaries located at: $WixBin" -ForegroundColor Green

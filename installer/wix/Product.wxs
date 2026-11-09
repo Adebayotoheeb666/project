@@ -56,7 +56,7 @@
                       Name="LSIA School Computer"
                       Description="Launch LSIA School Computer and Administration Desk"
                       Target="[INSTALLFOLDER]start-school-computer.bat"
-                      WorkingDirectory="[INSTALLFOLDER]" />
+                      WorkingDirectory="INSTALLFOLDER" />
             <Shortcut Id="OpenBrowserShortcut"
                       Name="LSIA Web Register"
                       Description="Open LSIA in default browser"
@@ -80,7 +80,7 @@
                     Name="LSIA School Computer"
                     Description="Launch LSIA School Computer"
                     Target="[INSTALLFOLDER]start-school-computer.bat"
-                    WorkingDirectory="[INSTALLFOLDER]" />
+                    WorkingDirectory="INSTALLFOLDER" />
           <RegistryValue Root="HKCU" Key="Software\LSIA\SchoolComputer" Name="desktop_shortcut" Type="integer" Value="1" KeyPath="yes" />
         </Component>
       </Directory>

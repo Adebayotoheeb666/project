@@ -12,25 +12,31 @@ Write-Host "========================================================" -Foregroun
 
 # --- Locate WiX binaries ---
 function Find-WixBin {
-    # 1. Already in PATH
+    # 1. Environment variable set by CI or user
+    if ($env:WIXBIN -and (Test-Path "$env:WIXBIN\candle.exe")) { return $env:WIXBIN }
+
+    # 2. GitHub Actions runner temp
+    if ($env:RUNNER_TEMP -and (Test-Path "$env:RUNNER_TEMP\wix311\candle.exe")) {
+        return "$env:RUNNER_TEMP\wix311"
+    }
+
+    # 3. Already in PATH
     $c = Get-Command "candle.exe" -ErrorAction SilentlyContinue
     if ($c) { return (Split-Path -Parent $c.Source) }
 
-    # 2. Environment variable set by CI
-    if ($env:WIXBIN -and (Test-Path "$env:WIXBIN\candle.exe")) { return $env:WIXBIN }
-
-    # 3. Standard install locations
+    # 4. Standard install locations
     $candidates = @(
         "C:\Program Files (x86)\WiX Toolset v3.11\bin",
         "C:\Program Files (x86)\WiX Toolset v3.14\bin",
         "C:\Program Files\WiX Toolset v3.11\bin",
-        "$env:RUNNER_TEMP\wix311"
+        "$env:TEMP\wix311_local",
+        "$env:TEMP\wix311"
     )
     foreach ($p in $candidates) {
         if ($p -and (Test-Path "$p\candle.exe")) { return $p }
     }
 
-    # 4. Search Program Files
+    # 5. Search Program Files
     $found = Get-ChildItem "C:\Program Files (x86)" -Filter "candle.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($found) { return $found.DirectoryName }
 
@@ -47,6 +53,9 @@ Write-Host "  WiX bin: $WixBin" -ForegroundColor Green
 $Candle = Join-Path $WixBin "candle.exe"
 $Light  = Join-Path $WixBin "light.exe"
 $Heat   = Join-Path $WixBin "heat.exe"
+
+$FirewallExt = Join-Path $WixBin "WixFirewallExtension.dll"
+$UiExt       = Join-Path $WixBin "WixUIExtension.dll"
 
 # --- Directories ---
 if (-not (Test-Path $OutputDir)) {
@@ -83,12 +92,12 @@ $ServerWxs = Join-Path $TempObj "ServerFiles.wxs"
 $AdminWxs  = Join-Path $TempObj "AdminFiles.wxs"
 
 # --- Harvest ---
-Write-Host "[2/4] Harvesting file lists with heat..." -ForegroundColor Green
-& $Heat dir "$StageServerDir" -cg ServerFilesGroup -dr SERVERFOLDER -scom -sfrag -srd `
+Write-Host "[2/4] Harvesting file lists with heat (-gg for valid component GUIDs)..." -ForegroundColor Green
+& $Heat dir "$StageServerDir" -cg ServerFilesGroup -dr SERVERFOLDER -scom -sfrag -srd -gg `
     -var "var.StageServerDir" -out "$ServerWxs"
 if ($LASTEXITCODE -ne 0) { Write-Error "heat failed for server files"; exit 1 }
 
-& $Heat dir "$AdminDistDir" -cg AdminFilesGroup -dr ADMINDISTFOLDER -scom -sfrag -srd `
+& $Heat dir "$AdminDistDir" -cg AdminFilesGroup -dr ADMINDISTFOLDER -scom -sfrag -srd -gg `
     -var "var.AdminDistDir" -out "$AdminWxs"
 if ($LASTEXITCODE -ne 0) { Write-Error "heat failed for admin dist files"; exit 1 }
 
@@ -96,7 +105,7 @@ if ($LASTEXITCODE -ne 0) { Write-Error "heat failed for admin dist files"; exit 
 Write-Host "[3/4] Compiling WiX sources (candle)..." -ForegroundColor Green
 & $Candle "$PSScriptRoot\Product.wxs" "$ServerWxs" "$AdminWxs" `
     -dRepoRoot="$RepoRoot" -dStageServerDir="$StageServerDir" -dAdminDistDir="$AdminDistDir" `
-    -ext WixFirewallExtension -ext WixUIExtension `
+    -ext "$FirewallExt" -ext "$UiExt" `
     -out "$TempObjDir"
 if ($LASTEXITCODE -ne 0) { Write-Error "candle compilation failed"; exit 1 }
 
@@ -108,7 +117,7 @@ $ServerObj  = Join-Path $TempObj "ServerFiles.wixobj"
 $AdminObj   = Join-Path $TempObj "AdminFiles.wixobj"
 
 & $Light "$ProductObj" "$ServerObj" "$AdminObj" `
-    -ext WixFirewallExtension -ext WixUIExtension `
+    -ext "$FirewallExt" -ext "$UiExt" `
     -sval -out "$MsiOutput"
 if ($LASTEXITCODE -ne 0) { Write-Error "light linking failed"; exit 1 }
 
