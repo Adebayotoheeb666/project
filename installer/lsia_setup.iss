@@ -36,18 +36,20 @@ Name: "firewall"; Description: "Allow School LAN connections on TCP port 8080 (R
 Source: "..\server\*"; DestDir: "{app}\server"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\admin\dist\*"; DestDir: "{app}\admin\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\scripts\*"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\scripts\start-school-computer.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\scripts\start-school-computer.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\scripts\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\Open Administration Desk"; Filename: "{#MyAppURL}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{#MyAppURL}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""LSIA School Server"" dir=in action=allow protocol=TCP localport=8080 profile=private,domain"; Flags: runhidden; Tasks: firewall
-Filename: "{app}\scripts\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: shellexec postinstall nowait skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: shellexec postinstall nowait skipifsilent
 
 [UninstallRun]
 Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""LSIA School Server"""; Flags: runhidden
